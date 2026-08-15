@@ -1,0 +1,25 @@
+{
+  "name": "Smart Minds",
+  "short_name": "SmartMinds",
+  "description": "AI-Powered Assistive Platform for Visually Impaired People",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1117",
+  "theme_color": "#00b894",
+  "orientation": "portrait-primary",
+  "categories": ["accessibility", "health", "utilities"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    { "name": "Emergency SOS", "url": "/?page=emergency", "description": "Activate emergency mode" },
+    { "name": "Voice Assistant", "url": "/?page=voice", "description": "Start voice commands" },
+    { "name": "My Location", "url": "/?page=location", "description": "Get current location" }
+  ]
+}
