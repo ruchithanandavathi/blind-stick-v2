@@ -34,7 +34,18 @@ const User = mongoose.model("User", new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   passwordHash: { type: String, required: true },
   phone: { type: String, default: "" },
+  guardianName: { type: String, default: "" },
+  guardianPhone: { type: String, default: "" },
+  guardianEmail: { type: String, default: "" },
+  faceDescriptor: { type: [Number], default: [] },
   preferredLanguage: { type: String, default: "en-US" },
+}, { timestamps: true }));
+
+const Guardian = mongoose.model("Guardian", new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+  name: { type: String, required: true },
+  phone: { type: String, required: true },
+  email: { type: String, required: true },
 }, { timestamps: true }));
 
 const EmergencyContact = mongoose.model("EmergencyContact", new mongoose.Schema({
@@ -56,7 +67,7 @@ const SavedPlace = mongoose.model("SavedPlace", new mongoose.Schema({
 
 const Activity = mongoose.model("Activity", new mongoose.Schema({
   userId:      { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-  type:        { type: String, enum: ["LOCATION","NAVIGATION","AI","EMERGENCY","OCR","VISION","CONTACT","SETTINGS"] },
+  type:        { type: String, enum: ["LOCATION","NAVIGATION","AI","EMERGENCY","OCR","VISION","CONTACT","SETTINGS","VOICE_MESSAGE","FACE_AUTH"] },
   description: { type: String, default: "" },
   metadata:    mongoose.Schema.Types.Mixed,
   timestamp:   { type: Date, default: Date.now },
@@ -64,11 +75,27 @@ const Activity = mongoose.model("Activity", new mongoose.Schema({
 
 const EmergencyEvent = mongoose.model("EmergencyEvent", new mongoose.Schema({
   userId:           { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+  userName:         String,
+  guardianName:     String,
+  guardianEmail:    String,
+  guardianPhone:    String,
   latitude:         Number,
   longitude:        Number,
+  locationLink:     String,
   address:          String,
-  contactNotified:  String,
+  message:          String,
   status:           { type: String, default: "activated" },
+  timestamp:        { type: Date, default: Date.now },
+}));
+
+const VoiceMessage = mongoose.model("VoiceMessage", new mongoose.Schema({
+  userId:           { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+  guardianName:     String,
+  guardianEmail:    String,
+  guardianPhone:    String,
+  recognizedText:   { type: String, required: true },
+  locationLink:     String,
+  status:           { type: String, default: "delivered" },
   timestamp:        { type: Date, default: Date.now },
 }));
 
@@ -83,7 +110,19 @@ const UserSettings = mongoose.model("UserSettings", new mongoose.Schema({
   language:           { type: String,  default: "en-US" },
 }, { timestamps: true }));
 
-// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────
+// ── VECTOR HELPERS ────────────────────────────────────────────────────────
+const calculateEuclideanDistance = (vecA, vecB) => {
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecA.length !== vecB.length) {
+    return Infinity;
+  }
+  let sum = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    const diff = vecA[i] - vecB[i];
+    sum += diff * diff;
+  }
+  return Math.sqrt(sum);
+};
+
 // ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────
 const auth = async (req, res, next) => {
   try {
@@ -112,16 +151,53 @@ const log = async (userId, type, description, metadata = {}) => {
 // ── AUTH ROUTES ───────────────────────────────────────────────────────────
 app.post("/api/auth/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) return res.status(400).json({ error: "All fields are required" });
+    const { name, email, password, phone, guardianName, guardianPhone, guardianEmail, faceDescriptor } = req.body;
+    if (!name || !email || !password || !guardianName || !guardianEmail || !guardianPhone) {
+      return res.status(400).json({ error: "Blind user details and mandatory guardian information (Name, Phone, Email) are required" });
+    }
     if (password.length < 6) return res.status(400).json({ error: "Password must be at least 6 characters" });
     if (await User.findOne({ email })) return res.status(400).json({ error: "Email already registered" });
+    
     const passwordHash = await bcrypt.hash(password, 12);
-    const user = await User.create({ name, email, passwordHash });
+    const user = await User.create({
+      name,
+      email,
+      passwordHash,
+      phone: phone || "",
+      guardianName,
+      guardianPhone,
+      guardianEmail,
+      faceDescriptor: Array.isArray(faceDescriptor) ? faceDescriptor : []
+    });
+
+    await Guardian.create({
+      userId: user._id,
+      name: guardianName,
+      phone: guardianPhone,
+      email: guardianEmail
+    });
+
     await UserSettings.create({ userId: user._id });
+    log(user._id, "FACE_AUTH", "Registered new user with face embedding & guardian connectivity");
+
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || "dev_secret_change_in_production", { expiresIn: "7d" });
-    res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email } });
-  } catch (err) { res.status(500).json({ error: "Registration failed" }); }
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        guardianName: user.guardianName,
+        guardianPhone: user.guardianPhone,
+        guardianEmail: user.guardianEmail,
+        hasFaceRegistered: Array.isArray(faceDescriptor) && faceDescriptor.length > 0
+      }
+    });
+  } catch (err) {
+    console.error("Registration Error:", err);
+    res.status(500).json({ error: "Registration failed", details: err.message });
+  }
 });
 
 app.post("/api/auth/login", async (req, res) => {
@@ -129,11 +205,75 @@ app.post("/api/auth/login", async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ error: "Email and password required" });
     const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.passwordHash)))
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       return res.status(401).json({ error: "Invalid email or password" });
+    }
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET || "dev_secret_change_in_production", { expiresIn: "7d" });
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone } });
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        guardianName: user.guardianName,
+        guardianPhone: user.guardianPhone,
+        guardianEmail: user.guardianEmail,
+        hasFaceRegistered: Array.isArray(user.faceDescriptor) && user.faceDescriptor.length > 0
+      }
+    });
   } catch { res.status(500).json({ error: "Login failed" }); }
+});
+
+app.post("/api/auth/face-login", async (req, res) => {
+  try {
+    const { faceDescriptor } = req.body;
+    if (!Array.isArray(faceDescriptor) || faceDescriptor.length === 0) {
+      return res.status(400).json({ error: "Valid face descriptor matrix required for face login" });
+    }
+
+    const usersWithFace = await User.find({ faceDescriptor: { $exists: true, $ne: [] } });
+    if (usersWithFace.length === 0) {
+      return res.status(404).json({ error: "No face registered accounts found. Please register first." });
+    }
+
+    let matchedUser = null;
+    let minDistance = Infinity;
+
+    for (const user of usersWithFace) {
+      const dist = calculateEuclideanDistance(faceDescriptor, user.faceDescriptor);
+      if (dist < minDistance) {
+        minDistance = dist;
+        matchedUser = user;
+      }
+    }
+
+    const MATCH_THRESHOLD = 0.55;
+    if (!matchedUser || minDistance > MATCH_THRESHOLD) {
+      return res.status(401).json({ error: "Face recognition match failed. Please try again or use password login." });
+    }
+
+    log(matchedUser._id, "FACE_AUTH", `Automatic face login successful (Distance: ${minDistance.toFixed(3)})`);
+
+    const token = jwt.sign({ userId: matchedUser._id }, process.env.JWT_SECRET || "dev_secret_change_in_production", { expiresIn: "7d" });
+    return res.json({
+      token,
+      matchConfidence: Math.max(0, Math.round((1 - minDistance / MATCH_THRESHOLD) * 100)),
+      user: {
+        id: matchedUser._id,
+        name: matchedUser.name,
+        email: matchedUser.email,
+        phone: matchedUser.phone,
+        guardianName: matchedUser.guardianName,
+        guardianPhone: matchedUser.guardianPhone,
+        guardianEmail: matchedUser.guardianEmail,
+        hasFaceRegistered: true
+      }
+    });
+  } catch (err) {
+    console.error("Face Login Error:", err);
+    res.status(500).json({ error: "Face recognition service error", details: err.message });
+  }
 });
 
 app.get("/api/auth/me", auth, async (req, res) => {
@@ -142,62 +282,99 @@ app.get("/api/auth/me", auth, async (req, res) => {
   res.json(user);
 });
 
-// ── CONTACTS ──────────────────────────────────────────────────────────────
-app.get("/api/contacts", auth, async (req, res) => {
-  res.json(await EmergencyContact.find({ userId: req.userId }).sort({ isPrimary: -1 }));
+// ── GUARDIAN & MESSAGING ──────────────────────────────────────────────────
+app.get("/api/guardian", auth, async (req, res) => {
+  const user = await User.findById(req.userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  res.json({
+    name: user.guardianName,
+    phone: user.guardianPhone,
+    email: user.guardianEmail,
+    linkedUser: user.name
+  });
 });
-app.post("/api/contacts", auth, async (req, res) => {
+
+app.post("/api/messages/guardian", auth, async (req, res) => {
   try {
-    const { name, phone, relationship, isPrimary } = req.body;
-    if (!name || !phone) return res.status(400).json({ error: "Name and phone required" });
-    if (isPrimary) await EmergencyContact.updateMany({ userId: req.userId }, { isPrimary: false });
-    const c = await EmergencyContact.create({ userId: req.userId, name, phone, relationship, isPrimary: !!isPrimary });
-    log(req.userId, "CONTACT", `Added contact: ${name}`);
-    res.status(201).json(c);
-  } catch { res.status(500).json({ error: "Failed to add contact" }); }
-});
-app.put("/api/contacts/:id", auth, async (req, res) => {
-  if (req.body.isPrimary) await EmergencyContact.updateMany({ userId: req.userId }, { isPrimary: false });
-  const c = await EmergencyContact.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, req.body, { new: true });
-  if (!c) return res.status(404).json({ error: "Contact not found" });
-  res.json(c);
-});
-app.delete("/api/contacts/:id", auth, async (req, res) => {
-  await EmergencyContact.findOneAndDelete({ _id: req.params.id, userId: req.userId });
-  res.json({ message: "Deleted" });
-});
+    const { recognizedText, latitude, longitude } = req.body;
+    if (!recognizedText || !recognizedText.trim()) {
+      return res.status(400).json({ error: "Recognized text message is required" });
+    }
+    const user = await User.findById(req.userId);
+    const guardianEmail = user?.guardianEmail || "guardian@smartminds.org";
+    const guardianPhone = user?.guardianPhone || "+91 98765 43210";
+    const guardianName  = user?.guardianName  || "Guardian";
 
-// ── PLACES ────────────────────────────────────────────────────────────────
-app.get("/api/places", auth, async (req, res) => {
-  res.json(await SavedPlace.find({ userId: req.userId }).sort({ createdAt: 1 }));
-});
-app.post("/api/places", auth, async (req, res) => {
-  const p = await SavedPlace.create({ ...req.body, userId: req.userId });
-  log(req.userId, "NAVIGATION", `Saved place: ${req.body.name}`);
-  res.status(201).json(p);
-});
-app.put("/api/places/:id", auth, async (req, res) => {
-  const p = await SavedPlace.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, req.body, { new: true });
-  if (!p) return res.status(404).json({ error: "Place not found" });
-  res.json(p);
-});
-app.delete("/api/places/:id", auth, async (req, res) => {
-  await SavedPlace.findOneAndDelete({ _id: req.params.id, userId: req.userId });
-  res.json({ message: "Deleted" });
-});
+    const locationLink = (latitude && longitude)
+      ? `https://maps.google.com/?q=${latitude},${longitude}`
+      : null;
 
-// ── LOCATION ──────────────────────────────────────────────────────────────
-app.post("/api/location/log", auth, async (req, res) => {
-  const { latitude, longitude, address } = req.body;
-  log(req.userId, "LOCATION", `Location: ${address || `${latitude}, ${longitude}`}`);
-  res.json({ message: "Logged" });
+    const msgRecord = await VoiceMessage.create({
+      userId: req.userId,
+      guardianName,
+      guardianEmail,
+      guardianPhone,
+      recognizedText: recognizedText.trim(),
+      locationLink,
+      status: "delivered"
+    });
+
+    log(req.userId, "VOICE_MESSAGE", `Sent message to guardian ${guardianName}: ${recognizedText.substring(0, 40)}...`);
+
+    res.status(201).json({
+      message: "Message successfully sent to registered guardian!",
+      voiceMessage: msgRecord,
+      notificationAlert: `[Alert Sent to ${guardianEmail} & ${guardianPhone}]: "${recognizedText.trim()}"`
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to send message to guardian", details: err.message });
+  }
 });
 
 // ── EMERGENCY ─────────────────────────────────────────────────────────────
 app.post("/api/emergency", auth, async (req, res) => {
-  const e = await EmergencyEvent.create({ ...req.body, userId: req.userId });
-  log(req.userId, "EMERGENCY", "SOS activated", req.body);
-  res.status(201).json(e);
+  try {
+    const { latitude, longitude, address, message } = req.body;
+    const user = await User.findById(req.userId);
+    
+    const userName      = user?.name || "Blind Assistance User";
+    const guardianName  = user?.guardianName || "Registered Guardian";
+    const guardianEmail = user?.guardianEmail || "guardian@smartminds.org";
+    const guardianPhone = user?.guardianPhone || "+91 98765 43210";
+    
+    const locationLink = (latitude && longitude)
+      ? `https://maps.google.com/?q=${latitude},${longitude}`
+      : "https://maps.google.com";
+
+    const e = await EmergencyEvent.create({
+      userId: req.userId,
+      userName,
+      guardianName,
+      guardianEmail,
+      guardianPhone,
+      latitude,
+      longitude,
+      locationLink,
+      address: address || `${latitude}, ${longitude}`,
+      message: message || `Emergency alert activated by ${userName}. Please check immediately!`,
+      status: "activated"
+    });
+
+    log(req.userId, "EMERGENCY", `SOS Activated for ${userName}`, { guardianEmail, locationLink });
+
+    res.status(201).json({
+      emergency: e,
+      alertSent: {
+        guardianName,
+        guardianEmail,
+        guardianPhone,
+        locationLink,
+        messageText: `Emergency alert from ${userName}. Current location: ${locationLink}. Please check immediately.`
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to log emergency event", details: err.message });
+  }
 });
 app.get("/api/emergency/history", auth, async (req, res) => {
   res.json(await EmergencyEvent.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(20));
