@@ -204,33 +204,26 @@ app.get("/api/emergency/history", auth, async (req, res) => {
 });
 
 // ── AI ────────────────────────────────────────────────────────────────────
-const getFallbackChatResponse = (msg) => {
-  const lower = (msg || "").toLowerCase();
-  if (lower.includes("safety") || lower.includes("navigate")) {
-    return "Safety Tip: Keep your cane or device ready, listen for ambient sound cues, and use audio orientation when crossing intersections.";
-  }
-  if (lower.includes("help") || lower.includes("do")) {
-    return "I am your Smart Minds voice assistant. I can help you with real-time location tracking, turn-by-turn navigation, emergency SOS calls, document reading, and scene hazard vision.";
-  }
-  if (lower.includes("weather")) {
-    return "The current weather condition is clear and pleasant, ideal for outdoor movement.";
-  }
-  if (lower.includes("crosswalk") || lower.includes("street")) {
-    return "A crosswalk has parallel white stripes on the road, often accompanied by tactile paving at curb ramps and audible pedestrian traffic signals.";
-  }
-  return `Smart Minds Voice Assistant: I received your question "${msg}". I am here to help you navigate, stay safe, and communicate effectively.`;
-};
-
 const callGemini = async ({ prompt, imageBase64, mediaType, systemPrompt }) => {
-  if (!process.env.GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || !apiKey.trim() || apiKey === "your_gemini_api_key_here") {
+    throw new Error("GEMINI_API_KEY is not configured in server/.env");
+  }
 
-  const body = {
-    contents: [{ role: "user", parts: [] }],
-    ...(systemPrompt ? { systemInstruction: { parts: [{ text: systemPrompt }] } } : {})
-  };
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+  const systemContext = (systemPrompt ? systemPrompt + "\n" : "") +
+    `Current System Date: ${dateStr}. Current Time: ${timeStr}. Answer the user's question directly, clearly, and concisely for text-to-speech reading.`;
+
+  const contents = [{
+    role: "user",
+    parts: []
+  }];
 
   if (imageBase64) {
-    body.contents[0].parts.push({
+    contents[0].parts.push({
       inlineData: {
         mimeType: mediaType || "image/jpeg",
         data: imageBase64
@@ -238,162 +231,121 @@ const callGemini = async ({ prompt, imageBase64, mediaType, systemPrompt }) => {
     });
   }
 
-  body.contents[0].parts.push({ text: prompt });
+  contents[0].parts.push({ text: prompt });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
+  const models = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest", "gemini-pro-latest", "gemini-2.5-flash"];
+  let lastError = null;
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data?.error?.message || "Gemini API request failed");
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey.trim())}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents,
+          systemInstruction: { parts: [{ text: systemContext }] }
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        if (data?.error?.message?.includes("systemInstruction")) {
+          const fallbackBody = {
+            contents: [{
+              role: "user",
+              parts: [{ text: `[System Context: ${systemContext}]\n\nUser Question: ${prompt}` }]
+            }]
+          };
+          if (imageBase64) fallbackBody.contents[0].parts.unshift(contents[0].parts[0]);
+
+          const retryRes = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(fallbackBody)
+          });
+          const retryData = await retryRes.json();
+          if (retryRes.ok && retryData?.candidates?.[0]?.content?.parts?.[0]?.text) {
+            return retryData.candidates[0].content.parts.map(p => p.text).filter(Boolean).join("\n").trim();
+          }
+          throw new Error(retryData?.error?.message || `Gemini API error (${retryRes.status})`);
+        }
+        throw new Error(data?.error?.message || `Gemini API error (${response.status})`);
+      }
+
+      const text = data?.candidates?.[0]?.content?.parts
+        ?.map(p => p.text)
+        .filter(Boolean)
+        .join("\n");
+
+      if (text && text.trim()) return text.trim();
+    } catch (err) {
+      lastError = err;
+      console.warn(`⚠️ Gemini Model ${model} attempt failed:`, err.message);
+    }
   }
 
-  const text = data?.candidates?.[0]?.content?.parts
-    ?.map(part => part.text)
-    .filter(Boolean)
-    .join("\n") || "";
-
-  if (!text) throw new Error("Gemini returned no content");
-  return text;
+  throw lastError || new Error("Gemini API request failed. Please check your API key and connection.");
 };
 
 app.post("/api/ai/chat", auth, async (req, res) => {
-  const { message } = req.body;
-  if (!message) return res.status(400).json({ error: "Message required" });
-
-  let lastError = null;
-
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const reply = await callGemini({
-        prompt: message,
-        systemPrompt: "You are Smart Minds AI, an accessibility assistant for visually impaired users. Give clear, concise, supportive answers suitable for text-to-speech."
-      });
-      log(req.userId, "AI", `Chat: ${message.substring(0, 60)}`);
-      return res.json({ reply });
-    } catch (err) {
-      console.warn("⚠️ Gemini API error:", err.message);
-      lastError = err.message;
+  try {
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: "Message is required" });
     }
-  }
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const Anthropic = require("@anthropic-ai/sdk");
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const resp = await client.messages.create({
-        model: "claude-3-5-sonnet-latest", max_tokens: 1000,
-        system: "You are Smart Minds AI, an accessibility assistant for visually impaired users. Give clear, concise, supportive answers suitable for text-to-speech.",
-        messages: [{ role: "user", content: message }]
-      });
-      log(req.userId, "AI", `Chat: ${message.substring(0, 60)}`);
-      return res.json({ reply: resp.content[0].text });
-    } catch (err) {
-      console.warn("⚠️ Anthropic API error:", err.message);
-      lastError = err.message;
-    }
-  }
+    const reply = await callGemini({
+      prompt: message.trim(),
+      systemPrompt: "You are Smart Minds AI, an accessibility assistant for visually impaired users. Provide direct, helpful, and concise answers suitable for text-to-speech."
+    });
 
-  log(req.userId, "AI", `Chat (Fallback): ${message.substring(0, 60)}`);
-  const baseReply = getFallbackChatResponse(message);
-  const replyWithNote = lastError 
-    ? `${baseReply}\n\n[API Note: ${lastError}. Please check your ANTHROPIC_API_KEY (sk-ant-...) or GEMINI_API_KEY (AIzaSy...) in server/.env]`
-    : baseReply;
-  return res.json({ reply: replyWithNote });
+    log(req.userId, "AI", `Chat: ${message.substring(0, 60)}`);
+    return res.json({ reply });
+  } catch (err) {
+    console.error("❌ Gemini Chat Error:", err.message);
+    return res.status(500).json({ error: "AI Assistant Error", details: err.message });
+  }
 });
 
 app.post("/api/ai/read-text", auth, async (req, res) => {
-  if (!req.body.imageBase64) return res.status(400).json({ error: "Image required" });
-
-  let lastError = null;
-
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const text = await callGemini({
-        prompt: "Extract and read all text in this image clearly.",
-        imageBase64: req.body.imageBase64,
-        mediaType: req.body.mediaType || "image/jpeg"
-      });
-      log(req.userId, "OCR", "Text extracted from image");
-      return res.json({ text });
-    } catch (err) {
-      console.warn("⚠️ Gemini OCR error:", err.message);
-      lastError = err.message;
+  try {
+    if (!req.body.imageBase64) {
+      return res.status(400).json({ error: "Image base64 data is required" });
     }
-  }
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const Anthropic = require("@anthropic-ai/sdk");
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const resp = await client.messages.create({
-        model: "claude-3-5-sonnet-latest", max_tokens: 1000,
-        messages: [{ role: "user", content: [
-          { type: "image", source: { type: "base64", media_type: req.body.mediaType || "image/jpeg", data: req.body.imageBase64 } },
-          { type: "text",  text: "Extract and read all text in this image clearly." }
-        ]}]
-      });
-      log(req.userId, "OCR", "Text extracted from image");
-      return res.json({ text: resp.content[0].text });
-    } catch (err) {
-      console.warn("⚠️ Anthropic OCR error:", err.message);
-      lastError = err.message;
-    }
-  }
+    const text = await callGemini({
+      prompt: "Extract and clearly read all text visible in this image in natural reading order.",
+      imageBase64: req.body.imageBase64,
+      mediaType: req.body.mediaType || "image/jpeg"
+    });
 
-  log(req.userId, "OCR", "Text extracted (Demo Fallback)");
-  return res.json({
-    text: `📄 Extracted Text (Smart Minds Scanner):\n\n'PATIENT MEDICINE INSTRUCTIONS\nTake 1 tablet twice daily after meals.\nStore in a cool, dry place away from sunlight.\nEmergency Helpline: +91 98765 43210'${lastError ? `\n\n[API Note: ${lastError}]` : ''}`
-  });
+    log(req.userId, "OCR", "Text extracted from image");
+    return res.json({ text });
+  } catch (err) {
+    console.error("❌ Gemini OCR Error:", err.message);
+    return res.status(500).json({ error: "OCR Service Error", details: err.message });
+  }
 });
 
 app.post("/api/ai/describe", auth, async (req, res) => {
-  if (!req.body.imageBase64) return res.status(400).json({ error: "Image required" });
-
-  let lastError = null;
-
-  if (process.env.GEMINI_API_KEY) {
-    try {
-      const description = await callGemini({
-        prompt: req.body.prompt || "Describe this scene for a visually impaired person. Include positions, hazards, and important details.",
-        imageBase64: req.body.imageBase64,
-        mediaType: req.body.mediaType || "image/jpeg"
-      });
-      log(req.userId, "VISION", "Scene described");
-      return res.json({ description });
-    } catch (err) {
-      console.warn("⚠️ Gemini Vision error:", err.message);
-      lastError = err.message;
+  try {
+    if (!req.body.imageBase64) {
+      return res.status(400).json({ error: "Image base64 data is required" });
     }
-  }
 
-  if (process.env.ANTHROPIC_API_KEY) {
-    try {
-      const Anthropic = require("@anthropic-ai/sdk");
-      const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-      const resp = await client.messages.create({
-        model: "claude-3-5-sonnet-latest", max_tokens: 1000,
-        messages: [{ role: "user", content: [
-          { type: "image", source: { type: "base64", media_type: req.body.mediaType || "image/jpeg", data: req.body.imageBase64 } },
-          { type: "text",  text: req.body.prompt || "Describe this scene for a visually impaired person. Include positions, hazards, and important details." }
-        ]}]
-      });
-      log(req.userId, "VISION", "Scene described");
-      return res.json({ description: resp.content[0].text });
-    } catch (err) {
-      console.warn("⚠️ Anthropic Vision error:", err.message);
-      lastError = err.message;
-    }
-  }
+    const description = await callGemini({
+      prompt: req.body.prompt || "Describe this scene for a visually impaired person. Highlight spatial positions, key objects, and potential walking hazards.",
+      imageBase64: req.body.imageBase64,
+      mediaType: req.body.mediaType || "image/jpeg"
+    });
 
-  log(req.userId, "VISION", "Scene described (Demo Fallback)");
-  return res.json({
-    description: `👁️ Scene Vision Analysis:\n\n1. Layout: Indoor floor area with clear walking space straight ahead.\n2. Objects: A table is situated 2 meters to your right. A door is located 4 meters straight ahead.\n3. Hazard Assessment: No immediate obstacles detected on your primary walking path. Surface appears dry and even.${lastError ? `\n\n[API Note: ${lastError}]` : ''}`
-  });
+    log(req.userId, "VISION", "Scene described");
+    return res.json({ description });
+  } catch (err) {
+    console.error("❌ Gemini Vision Error:", err.message);
+    return res.status(500).json({ error: "Vision AI Error", details: err.message });
+  }
 });
 
 // ── SETTINGS ──────────────────────────────────────────────────────────────
