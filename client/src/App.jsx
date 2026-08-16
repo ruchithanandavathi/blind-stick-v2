@@ -909,13 +909,24 @@ function LocationPage({ user, settings, showToast }) {
 
       {emailStatus && (
         <div className="card" style={{ marginTop: 14, borderColor: "var(--primary)" }}>
-          <div className="badge badge-green" style={{ marginBottom: 6 }}>✅ Email Dispatched</div>
+          <div className="badge badge-green" style={{ marginBottom: 6 }}>✅ Live Email Dispatched via Nodemailer</div>
           <div className="card-title">Location Email Sent</div>
-          <p className="card-sub">
-            <strong>Recipient:</strong> {emailStatus.guardianName} ({emailStatus.emailSentTo})<br />
-            <strong>Link:</strong> <a href={emailStatus.locationLink} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>Google Maps Link</a><br />
-            <strong>Sent Time:</strong> {emailStatus.timestamp}
+          <p className="card-sub" style={{ lineHeight: 1.6, margin: "8px 0" }}>
+            <strong>Guardian Recipient:</strong> {emailStatus.guardianName} ({emailStatus.emailSentTo})<br />
+            <strong>Maps Track Link:</strong> <a href={emailStatus.locationLink} target="_blank" rel="noreferrer" style={{ color: "var(--accent)", fontWeight: 700 }}>Google Maps Location</a><br />
+            <strong>Sent Timestamp:</strong> {emailStatus.timestamp}
           </p>
+          {emailStatus.emailDispatch?.previewUrl && (
+            <a
+              href={emailStatus.emailDispatch.previewUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ marginTop: 8 }}
+            >
+              📨 Open Live Email Inbox Preview (Guardian Email View)
+            </a>
+          )}
         </div>
       )}
     </main>

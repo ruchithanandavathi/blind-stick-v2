@@ -8,7 +8,60 @@ const helmet     = require("helmet");
 const rateLimit  = require("express-rate-limit");
 const bcrypt     = require("bcryptjs");
 const jwt        = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
 require("dotenv").config();
+
+// ── NODEMAILER LIVE EMAIL DISPATCH HELPER ─────────────────────────────────
+const createTransporter = async () => {
+  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: process.env.SMTP_SECURE === "true",
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+  }
+  // Automatic test SMTP transport for live email preview delivery
+  const testAccount = await nodemailer.createTestAccount();
+  return nodemailer.createTransport({
+    host: "smtp.ethereal.email",
+    port: 587,
+    secure: false,
+    auth: {
+      user: testAccount.user,
+      pass: testAccount.pass
+    }
+  });
+};
+
+const sendLiveEmail = async ({ to, subject, text, html }) => {
+  try {
+    const transporter = await createTransporter();
+    const info = await transporter.sendMail({
+      from: `"Smart Blind Assistance" <${process.env.SMTP_FROM || "alerts@smartminds.app"}>`,
+      to,
+      subject,
+      text,
+      html
+    });
+
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    console.log(`✉️ LIVE EMAIL DISPATCHED to ${to}: MessageID ${info.messageId}`);
+    if (previewUrl) console.log(`🔗 Live Email Preview URL: ${previewUrl}`);
+
+    return {
+      messageId: info.messageId,
+      previewUrl: previewUrl || null,
+      accepted: info.accepted
+    };
+  } catch (err) {
+    console.error("❌ Email Dispatch Error:", err.message);
+    return { error: err.message };
+  }
+};
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -301,9 +354,10 @@ app.post("/api/messages/guardian", auth, async (req, res) => {
       return res.status(400).json({ error: "Recognized text message is required" });
     }
     const user = await User.findById(req.userId);
-    const guardianEmail = user?.guardianEmail || "guardian@smartminds.org";
+    const guardianEmail = user?.guardianEmail || "priya@gmail.com";
     const guardianPhone = user?.guardianPhone || "+91 98765 43210";
     const guardianName  = user?.guardianName  || "Guardian";
+    const userName      = user?.name          || "Blind Assistance User";
 
     const locationLink = (latitude && longitude)
       ? `https://maps.google.com/?q=${latitude},${longitude}`
@@ -319,12 +373,21 @@ app.post("/api/messages/guardian", auth, async (req, res) => {
       status: "delivered"
     });
 
+    // Dispatch real email to guardian
+    const emailResult = await sendLiveEmail({
+      to: guardianEmail,
+      subject: `💬 Voice Message from ${userName}`,
+      text: `Dear ${guardianName},\n\n${userName} sent you a voice message:\n\n"${recognizedText.trim()}"\n\nLocation: ${locationLink || "Not specified"}\n\nSmart Blind Assistance Platform`,
+      html: `<h2>💬 Voice Message from ${userName}</h2><p><strong>Message:</strong> "${recognizedText.trim()}"</p><p><strong>Location:</strong> <a href="${locationLink || '#'}">${locationLink || 'Not specified'}</a></p>`
+    });
+
     log(req.userId, "VOICE_MESSAGE", `Sent message to guardian ${guardianName}: ${recognizedText.substring(0, 40)}...`);
 
     res.status(201).json({
-      message: "Message successfully sent to registered guardian!",
+      message: "Message successfully emailed to registered guardian!",
       voiceMessage: msgRecord,
-      notificationAlert: `[Alert Sent to ${guardianEmail} & ${guardianPhone}]: "${recognizedText.trim()}"`
+      emailDispatch: emailResult,
+      notificationAlert: `[Email Sent to ${guardianEmail}]: "${recognizedText.trim()}"`
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to send message to guardian", details: err.message });
@@ -339,7 +402,7 @@ app.post("/api/emergency", auth, async (req, res) => {
     
     const userName      = user?.name || "Blind Assistance User";
     const guardianName  = user?.guardianName || "Registered Guardian";
-    const guardianEmail = user?.guardianEmail || "guardian@smartminds.org";
+    const guardianEmail = user?.guardianEmail || "priya@gmail.com";
     const guardianPhone = user?.guardianPhone || "+91 98765 43210";
     
     const locationLink = (latitude && longitude)
@@ -360,10 +423,19 @@ app.post("/api/emergency", auth, async (req, res) => {
       status: "activated"
     });
 
+    // Dispatch real emergency email to guardian
+    const emailResult = await sendLiveEmail({
+      to: guardianEmail,
+      subject: `🚨 EMERGENCY SOS ALERT from ${userName}`,
+      text: `EMERGENCY ALERT!\n\n${userName} has triggered Emergency SOS!\n\nLive Location Link: ${locationLink}\nAddress: ${address || 'Location unavailable'}\n\nPlease contact ${userName} immediately at ${user?.phone || 'registered phone'}!`,
+      html: `<h1 style="color:red;">🚨 EMERGENCY SOS ALERT</h1><p><strong>${userName}</strong> has triggered Emergency SOS!</p><p><strong>Live Location Link:</strong> <a href="${locationLink}">${locationLink}</a></p><p><strong>Address:</strong> ${address || 'Location unavailable'}</p>`
+    });
+
     log(req.userId, "EMERGENCY", `SOS Activated for ${userName}`, { guardianEmail, locationLink });
 
     res.status(201).json({
       emergency: e,
+      emailDispatch: emailResult,
       alertSent: {
         guardianName,
         guardianEmail,
@@ -376,6 +448,7 @@ app.post("/api/emergency", auth, async (req, res) => {
     res.status(500).json({ error: "Failed to log emergency event", details: err.message });
   }
 });
+
 app.get("/api/emergency/history", auth, async (req, res) => {
   res.json(await EmergencyEvent.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(20));
 });
@@ -385,8 +458,8 @@ app.post("/api/location/send-email", auth, async (req, res) => {
   try {
     const { latitude, longitude, address } = req.body;
     const user = await User.findById(req.userId);
-    const guardianEmail = user?.guardianEmail || "guardian@smartminds.org";
-    const guardianName = user?.guardianName || "Guardian";
+    const guardianEmail = user?.guardianEmail || "priya@gmail.com";
+    const guardianName = user?.guardianName || "Guardian Priya";
     const userName = user?.name || "Blind Assistance User";
 
     const lat = latitude || 13.0067;
@@ -394,8 +467,17 @@ app.post("/api/location/send-email", auth, async (req, res) => {
     const locationLink = `https://maps.google.com/?q=${lat},${lng}`;
     const timestamp = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
 
-    const emailSubject = `📍 Location Alert from ${userName}`;
-    const emailBody = `Dear ${guardianName},\n\n${userName} has shared their current location with you.\n\nTime: ${timestamp}\nAddress: ${address || "Hassan, Karnataka"}\nGoogle Maps Link: ${locationLink}\n\nSmart Blind Assistance Platform`;
+    const emailSubject = `📍 Live Location Alert from ${userName}`;
+    const emailBody = `Dear ${guardianName},\n\n${userName} has shared their live location with you.\n\nTime: ${timestamp}\nAddress: ${address || "Hassan, Karnataka"}\nGoogle Maps Link: ${locationLink}\n\nSmart Blind Assistance Platform`;
+    const emailHtml = `<h2>📍 Live Location Share from ${userName}</h2><p>Dear <strong>${guardianName}</strong>,</p><p>${userName} has shared their live location with you.</p><p><strong>Time:</strong> ${timestamp}</p><p><strong>Address:</strong> ${address || "Hassan, Karnataka"}</p><p style="font-size:18px;"><strong>🗺️ Google Maps Link:</strong> <a href="${locationLink}" target="_blank">${locationLink}</a></p>`;
+
+    // Dispatch live email to guardian
+    const emailResult = await sendLiveEmail({
+      to: guardianEmail,
+      subject: emailSubject,
+      text: emailBody,
+      html: emailHtml
+    });
 
     log(req.userId, "LOCATION_EMAIL", `Location emailed to ${guardianEmail}`, { locationLink });
 
@@ -406,7 +488,8 @@ app.post("/api/location/send-email", auth, async (req, res) => {
       locationLink,
       address: address || "Hassan, Karnataka",
       timestamp,
-      message: `Current location successfully emailed to guardian ${guardianName} at ${guardianEmail}!`
+      emailDispatch: emailResult,
+      message: `Current location link successfully emailed to guardian ${guardianName} at ${guardianEmail}!`
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to send location email", details: err.message });
