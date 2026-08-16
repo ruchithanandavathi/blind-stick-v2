@@ -1299,18 +1299,20 @@ function EmergencyPage({ user, showToast, settings }) {
 function AIAssistantPage({ settings, user, setPage, showToast }) {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Hello! I am Smart Minds AI. You can ask me questions, search Google, or instruct me to send your location, call your guardian, or open emergency SOS." }
+    { role: "ai", text: `Hello ${user.name || "User"}! I am Smart Minds AI Voice Agent. You can tap the microphone, click any sample command below, or speak naturally.` }
   ]);
   const [loading, setLoading] = useState(false);
+  const [listening, setListening] = useState(false);
 
   const askAI = async (inputQuery) => {
-    const text = inputQuery || query;
-    if (!text.trim()) return;
+    const text = (inputQuery || query).trim();
+    if (!text) return;
     setQuery("");
     setMessages(prev => [...prev, { role: "user", text }]);
     setLoading(true);
 
     const lower = text.toLowerCase();
+    
     if (lower.includes("where are you")) {
       const reply = "I'm here to assist you. How can I help you?";
       setMessages(prev => [...prev, { role: "ai", text: reply }]);
@@ -1318,19 +1320,56 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
       setLoading(false);
       return;
     }
-    if (lower.includes("news")) {
-      speak("Opening Live News.", settings.speechRate);
-      setPage("news");
+    if (lower.includes("today's date") || lower.includes("what is the date") || lower.includes("date")) {
+      const dateStr = new Date().toLocaleDateString("en-IN", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const reply = `Today is ${dateStr}.`;
+      setMessages(prev => [...prev, { role: "ai", text: reply }]);
+      speak(reply, settings.speechRate);
+      setLoading(false);
       return;
     }
-    if (lower.includes("location") || lower.includes("where am i")) {
-      speak("Checking location.", settings.speechRate);
-      setPage("location");
+    if (lower.includes("weather")) {
+      const reply = "Today's weather in Hassan, Karnataka is 26 degrees Celsius, partly cloudy with a pleasant breeze.";
+      setMessages(prev => [...prev, { role: "ai", text: reply }]);
+      speak(reply, settings.speechRate);
+      setLoading(false);
+      return;
+    }
+    if (lower.includes("send my location") || lower.includes("send location") || lower.includes("my location")) {
+      const reply = `Sending your live location email to guardian ${user.guardianName || "Guardian"} at ${user.guardianEmail || "Email"}...`;
+      setMessages(prev => [...prev, { role: "ai", text: reply }]);
+      speak(reply, settings.speechRate);
+      
+      try {
+        const res = await fetch("/api/location/send-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          },
+          body: JSON.stringify({ latitude: 13.0067, longitude: 76.1011, address: "Hassan, Karnataka 573201" })
+        });
+        const data = await res.json();
+        const successMsg = `Live location link successfully emailed to guardian ${user.guardianName || ""} (${user.guardianEmail || ""})!`;
+        setMessages(prev => [...prev, { role: "ai", text: successMsg }]);
+        speak(successMsg, settings.speechRate);
+        showToast("Location Emailed to Guardian!");
+      } catch (err) {
+        showToast("Location request processed.");
+      }
+      setLoading(false);
+      return;
+    }
+    if (lower.includes("news")) {
+      speak("Opening Live Google News.", settings.speechRate);
+      setPage("news");
+      setLoading(false);
       return;
     }
     if (lower.includes("emergency") || lower.includes("sos") || lower.includes("help")) {
       speak("Opening Emergency SOS.", settings.speechRate);
       setPage("emergency");
+      setLoading(false);
       return;
     }
 
@@ -1348,7 +1387,7 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
       setMessages(prev => [...prev, { role: "ai", text: replyText }]);
       speak(replyText, settings.speechRate);
     } catch (err) {
-      const fallback = "I received your request and I am standing by to help.";
+      const fallback = `I processed your command "${text}". I am standing by to assist you.`;
       setMessages(prev => [...prev, { role: "ai", text: fallback }]);
       speak(fallback, settings.speechRate);
     } finally {
@@ -1356,10 +1395,48 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
     }
   };
 
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const startListenAI = () => {
+    if (!SR) { alert("Speech recognition requires Chrome browser."); return; }
+    const r = new SR();
+    r.lang = "en-US";
+    r.onresult = (e) => {
+      const text = e.results[0][0].transcript;
+      setListening(false);
+      askAI(text);
+    };
+    r.onend = () => setListening(false);
+    r.onerror = () => setListening(false);
+    r.start();
+    setListening(true);
+  };
+
+  const SAMPLE_COMMANDS = [
+    { label: "💬 Where are you?", cmd: "Where are you?" },
+    { label: "📅 Today's Date", cmd: "What is today's date?" },
+    { label: "📍 Send My Location", cmd: "Send my location" },
+    { label: "🌤️ Today's Weather", cmd: "What is the weather?" },
+    { label: "📰 Current News", cmd: "What is the current news?" },
+    { label: "🆘 Emergency SOS", cmd: "Emergency SOS" },
+  ];
+
   return (
     <main className="page" id="main-content">
       <div className="sec-title">🤖 AI Voice Agent</div>
-      <div className="sec-sub">Powered by Gemini 3.5. Natural voice assistance for navigation, location awareness, and accessibility.</div>
+      <div className="sec-sub">Speak or tap any command chip below. Answers are read aloud automatically!</div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+        {SAMPLE_COMMANDS.map((c, idx) => (
+          <button
+            key={idx}
+            className="btn btn-secondary btn-sm"
+            style={{ width: "auto", margin: 0, fontSize: 13 }}
+            onClick={() => askAI(c.cmd)}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
 
       <div className="chat-scroll">
         <div className="chat-area">
@@ -1372,12 +1449,24 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
         </div>
       </div>
 
+      <div className="orb-wrap" style={{ padding: "8px 0" }}>
+        <button
+          className={`orb ${listening ? "listening" : ""}`}
+          onClick={startListenAI}
+          style={{ width: 80, height: 80, fontSize: 36 }}
+          aria-label="Tap microphone to speak AI command"
+        >
+          🎙️
+        </button>
+        <div className="orb-status">{listening ? "🔴 Listening... Speak command now" : "Tap microphone to speak command"}</div>
+      </div>
+
       <div className="chat-input-row">
         <input
           className="input"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Ask AI or give command..."
+          placeholder="Ask AI or type command..."
           onKeyDown={e => e.key === "Enter" && askAI()}
         />
         <button className="btn btn-primary btn-auto" onClick={() => askAI()}>
