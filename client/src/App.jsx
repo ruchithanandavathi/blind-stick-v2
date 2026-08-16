@@ -382,6 +382,9 @@ const extractFaceDescriptorFromCanvas = (videoEl) => {
 function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError }) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const isPendingRef = useRef(false);
+  const pauseUntilRef = useRef(0);
+
   const [statusMsg, setStatusMsg] = useState(
     mode === "register"
       ? "Position your face inside the guide ring"
@@ -406,12 +409,12 @@ function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError })
 
         if (mode === "login") {
           scanInterval = setInterval(() => {
-            if (!videoRef.current) return;
+            if (!videoRef.current || isPendingRef.current || Date.now() < pauseUntilRef.current) return;
             const descriptor = extractFaceDescriptorFromCanvas(videoRef.current);
             if (descriptor && descriptor.length === 128) {
               attemptFaceLogin(descriptor);
             }
-          }, 1500);
+          }, 3500);
         }
       } catch (err) {
         if (!isMounted) return;
@@ -421,6 +424,9 @@ function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError })
     }
 
     async function attemptFaceLogin(descriptor) {
+      if (isPendingRef.current) return;
+      isPendingRef.current = true;
+
       try {
         const res = await fetch("/api/auth/face-login", {
           method: "POST",
@@ -428,15 +434,22 @@ function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError })
           body: JSON.stringify({ faceDescriptor: descriptor })
         });
         const data = await res.json();
+        
         if (res.ok && data.user) {
           if (scanInterval) clearInterval(scanInterval);
           speak("Face recognized. Welcome.", 1, "en-US");
           if (onFaceMatched) onFaceMatched(data);
+        } else if (res.status === 429) {
+          pauseUntilRef.current = Date.now() + 8000;
+          setStatusMsg("Rate limit paused. You can also sign in with password.");
         } else {
           setStatusMsg("Face not recognized. Please register or try again.");
         }
       } catch (err) {
-        setStatusMsg("Face recognition service offline. Use password login.");
+        pauseUntilRef.current = Date.now() + 5000;
+        setStatusMsg("Connection error. Use password login.");
+      } finally {
+        isPendingRef.current = false;
       }
     }
 
