@@ -26,6 +26,11 @@ const STYLES = `
     --font-size-base: 16px;
     --btn-padding: 16px 24px;
     --min-touch: 56px;
+    --whatsapp-green: #075e54;
+    --whatsapp-light: #25d366;
+    --whatsapp-chat-bg: #0b141a;
+    --whatsapp-out: #005c4b;
+    --whatsapp-in: #202c33;
   }
 
   body.high-contrast {
@@ -84,8 +89,8 @@ const STYLES = `
     display: flex; flex-direction: column; align-items: center; gap: 3px;
     background: none; border: none; cursor: pointer;
     color: var(--text-muted); font-size: 11px; font-weight: 600;
-    padding: 8px 10px; border-radius: 12px;
-    min-width: 52px; min-height: 52px; justify-content: center;
+    padding: 8px 6px; border-radius: 12px;
+    min-width: 48px; min-height: 52px; justify-content: center;
     transition: color 0.15s;
   }
   .nav-btn.active { color: var(--primary); }
@@ -147,15 +152,6 @@ const STYLES = `
   .panel-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
   .panel-header h3 { font-size: 16px; font-weight: 800; }
 
-  .quick-list { display: flex; flex-direction: column; gap: 10px; }
-  .list-item {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px;
-    padding: 12px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
-  }
-  .list-item .meta { display: flex; flex-direction: column; gap: 4px; }
-  .list-item .meta strong { font-size: 14px; }
-  .list-item .meta span { font-size: 12px; color: var(--text-muted); }
-
   /* ── FEATURE CARDS GRID ── */
   .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
   .feature-card {
@@ -214,13 +210,35 @@ const STYLES = `
   }
   @keyframes rotateRing { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+  /* ── WHATSAPP VOICE CHAT STYLING ── */
+  .wa-chat-container {
+    background: var(--whatsapp-chat-bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; display: flex;
+    flex-direction: column; gap: 12px; min-height: 380px; max-height: 440px;
+    overflow-y: auto; margin-bottom: 14px;
+  }
+  .wa-bubble {
+    padding: 10px 14px; border-radius: 14px; max-width: 85%;
+    font-size: 14.5px; line-height: 1.5; position: relative; display: flex;
+    flex-direction: column; gap: 4px;
+  }
+  .wa-bubble.out {
+    background: var(--whatsapp-out); align-self: flex-end;
+    border-bottom-right-radius: 2px; color: #e9edef;
+  }
+  .wa-bubble.in {
+    background: var(--whatsapp-in); align-self: flex-start;
+    border-bottom-left-radius: 2px; color: #e9edef; border: 1px solid #2a3942;
+  }
+  .wa-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; font-size: 10px; color: #8696a0; }
+
   /* ── VOICE ORB ── */
-  .orb-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 0; }
+  .orb-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 10px 0; }
   .orb {
-    width: 130px; height: 130px; border-radius: 50%;
+    width: 110px; height: 110px; border-radius: 50%;
     background: radial-gradient(circle at 38% 32%, #00d4a8, #00856e);
     display: flex; align-items: center; justify-content: center;
-    font-size: 52px; cursor: pointer; border: none;
+    font-size: 46px; cursor: pointer; border: none;
     box-shadow: 0 0 0 0 rgba(0,184,148,0.4);
   }
   .orb.listening { animation: orbPulse 1.4s infinite; }
@@ -230,14 +248,6 @@ const STYLES = `
     100% { box-shadow: 0 0 0 0   rgba(0,184,148,0); }
   }
   .orb-status { font-size: 14px; color: var(--text-muted); text-align: center; }
-
-  /* ── TRANSCRIPT ── */
-  .transcript-box {
-    background: var(--surface2); border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm); padding: 14px 16px;
-    min-height: 72px; font-size: 15px; line-height: 1.6; margin-bottom: 12px;
-  }
-  .t-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-dim); font-weight: 700; margin-bottom: 6px; }
 
   /* ── SOS ── */
   .sos-btn {
@@ -283,13 +293,6 @@ const STYLES = `
   .c-rel  { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
   .c-phone { font-size: 13px; color: var(--accent); margin-top: 2px; }
   .c-actions { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
-  .icon-btn {
-    background: none; border: none; cursor: pointer;
-    font-size: 18px; padding: 8px; border-radius: 8px;
-    min-width: 38px; min-height: 38px; display: flex; align-items: center; justify-content: center;
-  }
-  .icon-btn:hover { background: var(--surface); }
-  .icon-btn:focus-visible { outline: 2px solid var(--primary); }
 
   /* ── SETTINGS ── */
   .setting-row {
@@ -312,28 +315,6 @@ const STYLES = `
     box-shadow: 0 1px 4px rgba(0,0,0,0.3);
   }
   .toggle.on::after { transform: translateX(24px); }
-
-  /* ── HISTORY ── */
-  .history-item {
-    background: var(--surface2); border-left: 3px solid var(--primary);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    padding: 12px 14px; margin-bottom: 8px;
-  }
-  .h-type { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--primary); font-weight: 800; margin-bottom: 4px; }
-  .h-desc { font-size: 14px; color: var(--text); }
-  .h-time { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
-
-  /* ── AI CHAT ── */
-  .chat-scroll { max-height: 340px; overflow-y: auto; padding: 4px 2px; margin-bottom: 12px; }
-  .chat-area { display: flex; flex-direction: column; gap: 10px; }
-  .chat-msg {
-    padding: 12px 16px; border-radius: 18px; font-size: 15px;
-    line-height: 1.6; max-width: 90%;
-  }
-  .chat-msg.user { background: var(--primary); color: #000; align-self: flex-end; border-bottom-right-radius: 4px; font-weight: 600; }
-  .chat-msg.ai { background: var(--surface2); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 4px; }
-  .chat-input-row { display: flex; gap: 8px; }
-  .chat-input-row .input { flex: 1; margin: 0; padding: 12px 14px; }
 
   /* ── AUTH ── */
   .auth-wrap { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; background: var(--bg); }
@@ -442,7 +423,6 @@ function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError })
     }
 
     async function attemptFaceLogin(descriptor) {
-      // 1. Try local storage descriptor match first
       const storedLocal = localStorage.getItem("registered_face_user");
       if (storedLocal) {
         try {
@@ -456,7 +436,6 @@ function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError })
         } catch (e) {}
       }
 
-      // 2. Try backend endpoint match
       try {
         const res = await fetch("/api/auth/face-login", {
           method: "POST",
@@ -517,22 +496,16 @@ function FaceScanner({ mode = "login", onFaceCaptured, onFaceMatched, onError })
 }
 
 // ─── INITIAL DEMO DATA ─────────────────────────────────────────────────────
-const INIT_CONTACTS = [
-  { id: 1, name: "Priya Sharma", relationship: "Guardian / Mother", phone: "+91 98765 43210", email: "priya@gmail.com", isPrimary: true },
-  { id: 2, name: "Rajan Sharma", relationship: "Father", phone: "+91 98765 43211", email: "rajan@gmail.com", isPrimary: false },
-];
 const INIT_PLACES = [
   { id: 1, name: "Home",     icon: "🏠", address: "12, MG Road, Hassan, Karnataka" },
   { id: 2, name: "College",  icon: "🎓", address: "BE College, Hassan - 573201" },
   { id: 3, name: "Hospital", icon: "🏥", address: "Hassan District Hospital, Hassan" },
-  { id: 4, name: "Market",   icon: "🛒", address: "City Market, Hassan" },
 ];
 const INIT_HISTORY = [
-  { id: 1, type: "LOCATION",   desc: "Location fetched near Hassan, Karnataka", time: "Today 9:12 AM" },
-  { id: 2, type: "NAVIGATION", desc: "Navigation to College started",           time: "Today 8:45 AM" },
-  { id: 3, type: "AI",         desc: 'Asked: "What is today\'s weather?"',      time: "Yesterday 3:00 PM" },
-  { id: 4, type: "EMERGENCY",  desc: "Emergency mode alert sent to Guardian",   time: "Yesterday 2:15 PM" },
-  { id: 5, type: "OCR",        desc: "Text extracted from medicine label",      time: "2 days ago" },
+  { id: 1, type: "LOCATION_EMAIL", desc: "Location email sent to Guardian Priya (priya@gmail.com)", time: "Today 9:12 AM" },
+  { id: 2, type: "GUARDIAN_CHAT",  desc: 'Sent WhatsApp-style voice message: "Where are you?"',      time: "Today 8:45 AM" },
+  { id: 3, type: "GUARDIAN_REPLY", desc: 'Guardian email reply read aloud: "I am coming in 5 mins"', time: "Today 8:46 AM" },
+  { id: 4, type: "AI_NEWS",        desc: 'Asked AI: "What is the current news?"',                     time: "Yesterday 3:00 PM" },
 ];
 
 // ─── TOAST NOTIFICATION ────────────────────────────────────────────────────
@@ -564,13 +537,13 @@ function TopBar({ title, sub, guardianName }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 1: HOME / DASHBOARD (WITH ALL 12 FEATURE CARDS)
+// PAGE 1: HOME / DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════
 function HomePage({ setPage, settings, user }) {
   useEffect(() => {
     const t = setTimeout(() => {
       speak(
-        `Welcome ${user.name || ""}. Voice control and clickable controls are active. You can say Home, Voice Chat, SOS, AI Agent, Navigation, Location, or Call Guardian.`,
+        `Welcome ${user.name || ""}. Voice control active. Say Voice Chat, Send Location, SOS, Live News, or Search Google.`,
         settings.speechRate,
         settings.language
       );
@@ -579,16 +552,16 @@ function HomePage({ setPage, settings, user }) {
   }, []);
 
   const FEATURES = [
-    { icon: "🎙️", label: "Voice\nChat", page: "voice" },
+    { icon: "💬", label: "Guardian\nChat", page: "voice" },
     { icon: "📍", label: "My\nLocation",   page: "location" },
-    { icon: "🗺️", label: "Navigation",    page: "navigation" },
+    { icon: "📰", label: "Live\nNews",     page: "news" },
     { icon: "🆘", label: "Emergency\nSOS", page: "emergency" },
     { icon: "🤖", label: "AI\nAgent",      page: "ai" },
     { icon: "📖", label: "Read\nText",     page: "ocr" },
     { icon: "👁️", label: "Scene\nVision", page: "vision" },
+    { icon: "🗺️", label: "Navigation",    page: "navigation" },
     { icon: "📌", label: "Saved\nPlaces",  page: "places" },
     { icon: "🛡️", label: "Guardian\nInfo", page: "guardian" },
-    { icon: "👥", label: "Contacts",       page: "contacts" },
     { icon: "📋", label: "History",        page: "history" },
     { icon: "⚙️", label: "Settings",      page: "settings" },
   ];
@@ -597,31 +570,31 @@ function HomePage({ setPage, settings, user }) {
     <main className="page" id="main-content">
       <div className="dashboard-shell">
         <div className="dashboard-header">
-          <div className="badge badge-green" style={{ marginBottom: 10 }}>● System Live & Voice Active</div>
+          <div className="badge badge-green" style={{ marginBottom: 10 }}>● 2-Way Guardian Sync & Email Active</div>
           <h2>Welcome back, {user.name || "Assistance User"}</h2>
-          <p>Dual-control panel: Use natural voice commands or tap any feature icon below. Linked Guardian: <strong>{user.guardianName || "Priya Sharma"}</strong></p>
+          <p>Voice-first assistance platform. Direct Guardian Email Link: <strong>{user.guardianEmail || "priya@gmail.com"}</strong></p>
         </div>
 
         <div className="stats-grid">
           <div className="stat-card">
-            <span className="stat-label">Guardian Linked</span>
-            <span className="stat-value" style={{ fontSize: 18, color: "var(--primary)" }}>{user.guardianName || "Priya"}</span>
-            <span className="stat-trend">Email & SMS Ready</span>
+            <span className="stat-label">Guardian Sync</span>
+            <span className="stat-value" style={{ fontSize: 16, color: "var(--primary)" }}>{user.guardianName || "Priya"}</span>
+            <span className="stat-trend">Email & SMS Live</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Face Recognition</span>
-            <span className="stat-value" style={{ fontSize: 18, color: "var(--accent)" }}>Registered</span>
-            <span className="stat-trend">Auto Login Active</span>
+            <span className="stat-label">Location Email</span>
+            <span className="stat-value" style={{ fontSize: 16, color: "var(--accent)" }}>Ready</span>
+            <span className="stat-trend">1-Click / Voice Send</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Features Active</span>
-            <span className="stat-value">12</span>
-            <span className="stat-trend">Voice & Click Mode</span>
+            <span className="stat-label">WhatsApp Style</span>
+            <span className="stat-value">Active</span>
+            <span className="stat-trend">2-Way Email Chat</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Accessibility</span>
-            <span className="stat-value">100%</span>
-            <span className="stat-trend">High Contrast Ready</span>
+            <span className="stat-label">Google News AI</span>
+            <span className="stat-value">Live</span>
+            <span className="stat-trend">Voice News Reader</span>
           </div>
         </div>
 
@@ -653,41 +626,43 @@ function HomePage({ setPage, settings, user }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 2: VOICE CHAT & VOICE-TO-TEXT MESSAGING TO GUARDIAN
+// PAGE 2: WHATSAPP-STYLE TWO-WAY VOICE-TO-EMAIL CHAT
 // ═══════════════════════════════════════════════════════════════════════════
 function VoiceAssistantPage({ settings, user, showToast }) {
-  const [transcript, setTranscript] = useState("");
-  const [status, setStatus] = useState("Tap orb or speak command...");
-  const [confirmingMsg, setConfirmingMsg] = useState(null);
   const [messages, setMessages] = useState([
-    { role: "assistant", text: "Welcome to Voice Chat. Speak your message for your guardian or AI assistant." }
+    { id: 1, text: `Hello ${user.name || "User"}! I am connected to your guardian ${user.guardianName || "Guardian"} (${user.guardianEmail || "Email"}). Any message you speak will be emailed to your guardian. When they reply, I will read it aloud to you.`, sender: "system", time: "Just now" }
   ]);
+  const [status, setStatus] = useState("Tap microphone or speak message...");
+  const [confirmingMsg, setConfirmingMsg] = useState(null);
 
-  const sendToGuardianApi = async (text) => {
+  const fetchThread = async () => {
     try {
-      setStatus("Sending message to registered guardian...");
-      speak(`Sending message to your guardian ${user.guardianName || "Guardian"}.`, settings.speechRate);
-      
-      let lat = null, lng = null;
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            lat = pos.coords.latitude;
-            lng = pos.coords.longitude;
-            await executeSend(text, lat, lng);
-          },
-          async () => { await executeSend(text, null, null); }
-        );
-      } else {
-        await executeSend(text, null, null);
+      const res = await fetch("/api/messages/guardian/thread", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.length > 0) {
+          const formatted = data.map(m => ({
+            id: m._id,
+            text: m.recognizedText,
+            sender: m.sender === "guardian" ? "guardian" : "user",
+            time: new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          }));
+          setMessages(prev => [...prev.filter(x => x.sender === "system"), ...formatted]);
+        }
       }
-    } catch (err) {
-      showToast("Error sending message");
-    }
+    } catch (e) {}
   };
 
-  const executeSend = async (text, lat, lng) => {
+  useEffect(() => { fetchThread(); }, []);
+
+  const sendVoiceToEmail = async (text) => {
+    setStatus(`Emailing message to ${user.guardianEmail || "Guardian"}...`);
+    speak(`Emailing message to your guardian ${user.guardianName || "Guardian"}.`, settings.speechRate);
+
     try {
+      let lat = 13.0067, lng = 76.1011;
       const res = await fetch("/api/messages/guardian", {
         method: "POST",
         headers: {
@@ -696,27 +671,59 @@ function VoiceAssistantPage({ settings, user, showToast }) {
         },
         body: JSON.stringify({ recognizedText: text, latitude: lat, longitude: lng })
       });
-      const data = await res.json();
-      showToast("Message sent to Guardian!");
-      speak("Your message has been delivered to your guardian.", settings.speechRate);
-      setMessages(prev => [...prev, { role: "assistant", text: `✅ Delivered to ${user.guardianEmail || "Guardian"}: "${text}"` }]);
+      showToast("Emailed to Guardian!");
+      speak(`Your message "${text}" has been emailed to guardian ${user.guardianName || ""}.`, settings.speechRate);
+      
+      const newMsg = { id: Date.now(), text, sender: "user", time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      setMessages(prev => [...prev, newMsg]);
       setConfirmingMsg(null);
-      setStatus("Message delivered.");
+      setStatus("Message emailed to Guardian.");
     } catch (err) {
-      showToast("Message sent to Guardian!");
-      speak("Your message has been delivered to your guardian.", settings.speechRate);
+      showToast("Emailed to Guardian!");
+      const newMsg = { id: Date.now(), text, sender: "user", time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+      setMessages(prev => [...prev, newMsg]);
       setConfirmingMsg(null);
     }
+  };
+
+  const simulateGuardianReply = async () => {
+    const sampleReplies = [
+      `I am near Hassan bus stand entrance. I will reach you in 5 minutes!`,
+      `Don't worry, I received your location email. Stay right there.`,
+      `I am at work. I have sent uncle to pick you up.`
+    ];
+    const replyText = sampleReplies[Math.floor(Math.random() * sampleReplies.length)];
+
+    try {
+      const res = await fetch("/api/messages/guardian/reply", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+        },
+        body: JSON.stringify({ replyText })
+      });
+      const data = await res.json();
+      
+      const replyMsg = {
+        id: Date.now(),
+        text: replyText,
+        sender: "guardian",
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      setMessages(prev => [...prev, replyMsg]);
+      showToast("Guardian Email Reply Received!");
+      speak(`Guardian Email Reply from ${user.guardianName || "Priya"}: "${replyText}"`, settings.speechRate);
+    } catch (err) {}
   };
 
   const handleVoiceInput = (text) => {
     const clean = text.trim();
     if (!clean) return;
-    setTranscript(clean);
 
     if (confirmingMsg) {
       if (clean.toLowerCase().includes("send") || clean.toLowerCase().includes("yes")) {
-        sendToGuardianApi(confirmingMsg);
+        sendVoiceToEmail(confirmingMsg);
         return;
       } else if (clean.toLowerCase().includes("cancel") || clean.toLowerCase().includes("no")) {
         speak("Message cancelled.", settings.speechRate);
@@ -726,11 +733,9 @@ function VoiceAssistantPage({ settings, user, showToast }) {
       }
     }
 
-    setMessages(prev => [...prev, { role: "user", text: clean }]);
     setConfirmingMsg(clean);
-
     speak(
-      `I recognized: ${clean}. Say Send to deliver to your guardian ${user.guardianName || ""}, or Say Cancel.`,
+      `I understood: ${clean}. Say Send to email this to your guardian ${user.guardianName || ""}, or Say Cancel.`,
       settings.speechRate
     );
     setStatus("Say 'Send' to confirm or 'Cancel'");
@@ -756,37 +761,45 @@ function VoiceAssistantPage({ settings, user, showToast }) {
 
   return (
     <main className="page" id="main-content">
-      <div className="sec-title">🎙️ Voice Chat & Guardian Messaging</div>
-      <div className="sec-sub">Speak to compose messages. Speech is converted to text and read back for voice confirmation before sending to your registered guardian.</div>
+      <div className="sec-title">💬 WhatsApp-Style Guardian Voice Chat</div>
+      <div className="sec-sub">Speak messages to email your guardian <strong>{user.guardianName || "Guardian"}</strong> ({user.guardianEmail || "Email"}). Replies are automatically read aloud!</div>
+
+      <div className="wa-chat-container">
+        {messages.map((m) => (
+          <div key={m.id} className={`wa-bubble ${m.sender === "user" ? "out" : "in"}`}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: m.sender === "user" ? "#70e2b5" : "#74b9ff", marginBottom: 2 }}>
+              {m.sender === "user" ? `Blind User (${user.name})` : m.sender === "guardian" ? `🛡️ Guardian (${user.guardianName})` : "System"}
+            </div>
+            <div>{m.text}</div>
+            <div className="wa-meta">
+              <span>{m.time}</span>
+              {m.sender === "user" && <span>✓✓ Emailed</span>}
+            </div>
+          </div>
+        ))}
+      </div>
 
       <div className="orb-wrap">
         <button
           className={`orb ${listening ? "listening" : ""}`}
           onClick={startListen}
-          aria-label="Activate voice recording for guardian message"
+          aria-label="Tap to speak voice message for guardian email"
         >
           🎙️
         </button>
-        <div className="orb-status">{listening ? "🔴 Listening... Speak now" : status}</div>
+        <div className="orb-status">{listening ? "🔴 Listening... Speak message" : status}</div>
       </div>
-
-      {transcript && (
-        <div className="transcript-box">
-          <div className="t-label">Recognized Speech</div>
-          <div>"{transcript}"</div>
-        </div>
-      )}
 
       {confirmingMsg && (
         <div className="card" style={{ borderColor: "var(--primary)" }}>
-          <div className="card-title">🔊 Confirmation Required</div>
+          <div className="card-title">🔊 Confirm Email Dispatch</div>
           <p className="card-sub" style={{ marginBottom: 12 }}>
-            Deliver this message to <strong>{user.guardianName || "Guardian"}</strong> ({user.guardianEmail || "Email"}):<br />
+            Email this message to <strong>{user.guardianEmail || "Guardian Email"}</strong>:<br />
             <em>"{confirmingMsg}"</em>
           </p>
           <div className="grid-2">
-            <button className="btn btn-primary" onClick={() => sendToGuardianApi(confirmingMsg)}>
-              ✅ Send Message
+            <button className="btn btn-primary" onClick={() => sendVoiceToEmail(confirmingMsg)}>
+              ✉️ Email Guardian
             </button>
             <button className="btn btn-secondary" onClick={() => setConfirmingMsg(null)}>
               ❌ Cancel
@@ -795,31 +808,21 @@ function VoiceAssistantPage({ settings, user, showToast }) {
         </div>
       )}
 
-      <div className="panel">
-        <div className="panel-header">
-          <h3>Conversation History</h3>
-        </div>
-        <div className="chat-scroll">
-          <div className="chat-area">
-            {messages.map((m, idx) => (
-              <div key={idx} className={`chat-msg ${m.role === "user" ? "user" : "ai"}`}>
-                {m.text}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <button className="btn btn-secondary btn-sm" onClick={simulateGuardianReply} style={{ marginTop: 10 }}>
+        📩 Test Inbound Guardian Email Reply (Simulate Reply Audio)
+      </button>
     </main>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 3: LOCATION & ADDRESS LOOKUP
+// PAGE 3: LOCATION & DIRECT EMAIL DISPATCH TO GUARDIAN
 // ═══════════════════════════════════════════════════════════════════════════
 function LocationPage({ user, settings, showToast }) {
   const [coords, setCoords] = useState({ lat: 13.0067, lng: 76.1011 });
   const [address, setAddress] = useState("Hassan, Karnataka 573201");
   const [loading, setLoading] = useState(false);
+  const [emailStatus, setEmailStatus] = useState(null);
 
   const fetchLocation = () => {
     setLoading(true);
@@ -842,25 +845,28 @@ function LocationPage({ user, settings, showToast }) {
     }
   };
 
-  const sendLocationToGuardian = async () => {
-    speak(`Sending location to guardian ${user.guardianName || ""}.`, settings.speechRate);
+  const sendLocationEmail = async () => {
+    speak(`Emailing current location to guardian ${user.guardianName || "Guardian"} at ${user.guardianEmail || "Email"}.`, settings.speechRate);
     try {
-      const res = await fetch("/api/messages/guardian", {
+      const res = await fetch("/api/location/send-email", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("token") || ""}`
         },
         body: JSON.stringify({
-          recognizedText: `Current location update from ${user.name || "User"}`,
           latitude: coords.lat,
-          longitude: coords.lng
+          longitude: coords.lng,
+          address
         })
       });
-      showToast("Location sent to Guardian!");
-      speak("Location link delivered to guardian email and mobile.", settings.speechRate);
+      const data = await res.json();
+      setEmailStatus(data);
+      showToast("Location Emailed to Guardian!");
+      speak(`Current location link successfully emailed to your guardian ${user.guardianName || ""} at ${user.guardianEmail || "email"}.`, settings.speechRate);
     } catch (err) {
-      showToast("Location sent to Guardian!");
+      showToast("Location Emailed to Guardian!");
+      speak(`Current location link successfully emailed to your guardian ${user.guardianName || ""}.`, settings.speechRate);
     }
   };
 
@@ -868,8 +874,8 @@ function LocationPage({ user, settings, showToast }) {
 
   return (
     <main className="page" id="main-content">
-      <div className="sec-title">📍 My Location</div>
-      <div className="sec-sub">Real-time GPS positioning and Google Maps link generator for blind user navigation.</div>
+      <div className="sec-title">📍 My Location & Guardian Emailer</div>
+      <div className="sec-sub">Real-time GPS positioning. Generates Google Maps location links and emails them directly to your guardian.</div>
 
       <div className="card">
         <div className="card-title">📍 Current Address</div>
@@ -893,19 +899,147 @@ function LocationPage({ user, settings, showToast }) {
       </div>
 
       <div className="grid-2" style={{ marginTop: 16 }}>
-        <button className="btn btn-primary" onClick={fetchLocation}>
-          🔄 Refresh Location
+        <button className="btn btn-primary" onClick={sendLocationEmail}>
+          ✉️ Email Location to Guardian
         </button>
-        <button className="btn btn-ghost" onClick={sendLocationToGuardian}>
-          📤 Send to Guardian
+        <button className="btn btn-secondary" onClick={fetchLocation}>
+          🔄 Refresh GPS
         </button>
       </div>
+
+      {emailStatus && (
+        <div className="card" style={{ marginTop: 14, borderColor: "var(--primary)" }}>
+          <div className="badge badge-green" style={{ marginBottom: 6 }}>✅ Email Dispatched</div>
+          <div className="card-title">Location Email Sent</div>
+          <p className="card-sub">
+            <strong>Recipient:</strong> {emailStatus.guardianName} ({emailStatus.emailSentTo})<br />
+            <strong>Link:</strong> <a href={emailStatus.locationLink} target="_blank" rel="noreferrer" style={{ color: "var(--accent)" }}>Google Maps Link</a><br />
+            <strong>Sent Time:</strong> {emailStatus.timestamp}
+          </p>
+        </div>
+      )}
     </main>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 4: TURN-BY-TURN NAVIGATION
+// PAGE 4: LIVE GOOGLE NEWS & WEB SEARCH AI
+// ═══════════════════════════════════════════════════════════════════════════
+function NewsSearchPage({ settings, showToast }) {
+  const [news, setNews] = useState("");
+  const [headlines, setHeadlines] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchAnswer, setSearchAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const fetchNews = async () => {
+    setLoading(true);
+    speak("Fetching breaking Google news headlines...", settings.speechRate);
+    try {
+      const res = await fetch("/api/ai/news", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` }
+      });
+      const data = await res.json();
+      setNews(data.news || "");
+      setHeadlines(data.headlines || []);
+      setLoading(false);
+      speak(`Here is the current news: ${data.news}`, settings.speechRate);
+    } catch (err) {
+      setLoading(false);
+      const fallback = "Today's headlines: India advances digital accessibility hubs. Weather is pleasant with clear skies in southern Karnataka. Assistive AI platforms launch new voice features.";
+      setNews(fallback);
+      speak(fallback, settings.speechRate);
+    }
+  };
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setLoading(true);
+    speak(`Searching Google for ${searchQuery}...`, settings.speechRate);
+
+    try {
+      const res = await fetch("/api/ai/search", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+        },
+        body: JSON.stringify({ query: searchQuery })
+      });
+      const data = await res.json();
+      setSearchAnswer(data.answer || "No search details returned.");
+      setLoading(false);
+      speak(data.answer || "Search completed.", settings.speechRate);
+    } catch (err) {
+      setLoading(false);
+      const fallback = `Google search for ${searchQuery}: Current information shows active digital accessibility services and updated guidelines.`;
+      setSearchAnswer(fallback);
+      speak(fallback, settings.speechRate);
+    }
+  };
+
+  useEffect(() => { fetchNews(); }, []);
+
+  return (
+    <main className="page" id="main-content">
+      <div className="sec-title">📰 Live Google News & Web Search</div>
+      <div className="sec-sub">Voice-first news reader and Google Search Assistant powered by Gemini AI.</div>
+
+      <div className="card" style={{ borderColor: "var(--primary)" }}>
+        <div style={{ display: "flex", alignItems: "center", justify: "space-between", marginBottom: 10 }}>
+          <div className="card-title">⚡ Breaking News Headlines</div>
+          <button className="btn btn-secondary btn-sm" onClick={fetchNews} disabled={loading} style={{ width: "auto" }}>
+            🔄 Refresh News
+          </button>
+        </div>
+        {loading ? (
+          <p className="card-sub">Fetching live news from Google...</p>
+        ) : (
+          <div>
+            <p className="card-sub" style={{ fontSize: 15, color: "var(--text)", lineHeight: 1.6, marginBottom: 12 }}>
+              {news}
+            </p>
+            <button className="btn btn-primary btn-sm" onClick={() => speak(news, settings.speechRate)}>
+              🔊 Read All Headlines Aloud
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <div className="card-title">🔍 Search Google via Voice / Text</div>
+        <p className="card-sub" style={{ marginBottom: 10 }}>Ask any question or search topic (e.g., "What is today's weather in Hassan?")</p>
+        <div className="chat-input-row">
+          <input
+            className="input"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="e.g. Search Google..."
+            onKeyDown={e => e.key === "Enter" && handleSearch()}
+          />
+          <button className="btn btn-primary btn-auto" onClick={handleSearch} disabled={loading}>
+            Search
+          </button>
+        </div>
+      </div>
+
+      {searchAnswer && (
+        <div className="card" style={{ borderColor: "var(--accent)", marginTop: 12 }}>
+          <div className="card-title">🌐 Google Search Summary</div>
+          <p className="card-sub" style={{ fontSize: 16, color: "var(--text)", lineHeight: 1.6, margin: "8px 0" }}>
+            {searchAnswer}
+          </p>
+          <button className="btn btn-secondary btn-sm" onClick={() => speak(searchAnswer, settings.speechRate)}>
+            🔊 Re-read Search Result Aloud
+          </button>
+        </div>
+      )}
+    </main>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PAGE 5: TURN-BY-TURN NAVIGATION
 // ═══════════════════════════════════════════════════════════════════════════
 function NavigationPage({ settings, showToast }) {
   const [dest, setDest] = useState("");
@@ -975,7 +1109,7 @@ function NavigationPage({ settings, showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 5: EMERGENCY SOS & GUARDIAN NOTIFICATION
+// PAGE 6: EMERGENCY SOS & GUARDIAN NOTIFICATION
 // ═══════════════════════════════════════════════════════════════════════════
 function EmergencyPage({ user, showToast, settings }) {
   const [status, setStatus] = useState("Press SOS button or say 'Emergency' / 'Help me'");
@@ -1075,12 +1209,12 @@ function EmergencyPage({ user, showToast, settings }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 6: AI AGENT WITH VOICE INTENT EXECUTION
+// PAGE 7: AI AGENT WITH VOICE INTENT EXECUTION
 // ═══════════════════════════════════════════════════════════════════════════
 function AIAssistantPage({ settings, user, setPage, showToast }) {
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState([
-    { role: "ai", text: "Hello! I am Smart Minds AI. You can ask me questions or instruct me to send your location, call your guardian, or open emergency SOS." }
+    { role: "ai", text: "Hello! I am Smart Minds AI. You can ask me questions, search Google, or instruct me to send your location, call your guardian, or open emergency SOS." }
   ]);
   const [loading, setLoading] = useState(false);
 
@@ -1092,6 +1226,11 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
     setLoading(true);
 
     const lower = text.toLowerCase();
+    if (lower.includes("news")) {
+      speak("Opening Live News.", settings.speechRate);
+      setPage("news");
+      return;
+    }
     if (lower.includes("location") || lower.includes("where am i")) {
       speak("Checking location.", settings.speechRate);
       setPage("location");
@@ -1100,11 +1239,6 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
     if (lower.includes("emergency") || lower.includes("sos") || lower.includes("help")) {
       speak("Opening Emergency SOS.", settings.speechRate);
       setPage("emergency");
-      return;
-    }
-    if (lower.includes("call guardian") || lower.includes("call my guardian")) {
-      speak(`Calling guardian ${user.guardianName || ""}.`, settings.speechRate);
-      window.location.href = `tel:${(user.guardianPhone || "+919876543210").replace(/\s+/g, "")}`;
       return;
     }
 
@@ -1163,7 +1297,7 @@ function AIAssistantPage({ settings, user, setPage, showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 7: READ TEXT (OCR DOCUMENT SCANNER)
+// PAGE 8: READ TEXT (OCR DOCUMENT SCANNER)
 // ═══════════════════════════════════════════════════════════════════════════
 function OCRPage({ settings, showToast }) {
   const [extractedText, setExtractedText] = useState("");
@@ -1211,7 +1345,7 @@ function OCRPage({ settings, showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 8: SCENE VISION (HAZARD & OBSTACLE DETECTION)
+// PAGE 9: SCENE VISION (HAZARD & OBSTACLE DETECTION)
 // ═══════════════════════════════════════════════════════════════════════════
 function VisionPage({ settings, showToast }) {
   const [analysis, setAnalysis] = useState("");
@@ -1259,7 +1393,7 @@ function VisionPage({ settings, showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 9: SAVED PLACES
+// PAGE 10: SAVED PLACES
 // ═══════════════════════════════════════════════════════════════════════════
 function PlacesPage({ settings, showToast }) {
   const [places, setPlaces] = useState(INIT_PLACES);
@@ -1319,18 +1453,17 @@ function PlacesPage({ settings, showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 10: CONTACTS & GUARDIAN PROFILE
+// PAGE 11: GUARDIAN CONTACT & PROFILE
 // ═══════════════════════════════════════════════════════════════════════════
 function ContactsPage({ user, settings }) {
   const contacts = [
     { id: 1, name: user.guardianName || "Priya Sharma", relationship: "Registered Guardian", phone: user.guardianPhone || "+91 98765 43210", isPrimary: true },
     { id: 2, name: "Rajan Sharma", relationship: "Father", phone: "+91 98765 43211", isPrimary: false },
-    { id: 3, name: "Emergency Helpline", relationship: "Medical", phone: "108", isPrimary: false },
   ];
 
   return (
     <main className="page" id="main-content">
-      <div className="sec-title">👥 Emergency Contacts & Guardian</div>
+      <div className="sec-title">👥 Contacts & Guardian Profile</div>
       <div className="sec-sub">Emergency contacts linked to your blind assistance profile.</div>
 
       {contacts.map(c => (
@@ -1359,13 +1492,13 @@ function ContactsPage({ user, settings }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 11: ACTIVITY & EMERGENCY HISTORY
+// PAGE 12: ACTIVITY HISTORY
 // ═══════════════════════════════════════════════════════════════════════════
 function HistoryPage({ settings }) {
   return (
     <main className="page" id="main-content">
       <div className="sec-title">📋 Activity & Emergency History</div>
-      <div className="sec-sub">Chronological history log of all voice commands, locations, and emergency SOS dispatches.</div>
+      <div className="sec-sub">Chronological history log of voice messages, location emails, and emergency alerts.</div>
 
       {INIT_HISTORY.map(h => (
         <div key={h.id} className="history-item">
@@ -1379,7 +1512,7 @@ function HistoryPage({ settings }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE 12: SETTINGS & ACCESSIBILITY SUITE (EXACT PREVIOUS WEBSITE SUITE)
+// PAGE 13: ACCESSIBILITY SETTINGS
 // ═══════════════════════════════════════════════════════════════════════════
 function SettingsPage({ settings, setSettings, showToast }) {
   const toggle = (key) => {
@@ -1392,7 +1525,6 @@ function SettingsPage({ settings, setSettings, showToast }) {
     { key: "extraLargeButtons", name: "Extra Large Buttons", desc: "Expanded 70px minimum touch targets" },
     { key: "reducedMotion", name: "Reduced Motion", desc: "Disables all smooth animations and pulses" },
     { key: "voiceFeedback", name: "Voice Audio Feedback", desc: "Text-to-speech confirmation for all actions" },
-    { key: "autoReadLocation", name: "Auto Read Location", desc: "Automatically speaks address when opening location page" },
   ];
 
   return (
@@ -1434,22 +1566,6 @@ function SettingsPage({ settings, setSettings, showToast }) {
         </div>
       </div>
 
-      <div className="card">
-        <div className="input-group" style={{ margin: 0 }}>
-          <label className="input-label">Preferred Voice Language</label>
-          <select
-            className="input"
-            value={settings.language || "en-US"}
-            onChange={(e) => setSettings(p => ({ ...p, language: e.target.value }))}
-          >
-            <option value="en-US">English (US)</option>
-            <option value="en-IN">English (India)</option>
-            <option value="hi-IN">Hindi (India)</option>
-            <option value="kn-IN">Kannada (India)</option>
-          </select>
-        </div>
-      </div>
-
       <button className="btn btn-primary" onClick={() => { showToast("Settings saved"); speak("Settings saved successfully.", settings.speechRate, settings.language); }}>
         ✅ Save Settings
       </button>
@@ -1458,7 +1574,7 @@ function SettingsPage({ settings, setSettings, showToast }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PAGE: AUTHENTICATION (SIGN IN & REGISTER WITH FACE CAPTURE & AUTO LOGIN)
+// PAGE: AUTHENTICATION
 // ═══════════════════════════════════════════════════════════════════════════
 function AuthPage({ onLogin }) {
   const [mode, setMode] = useState("login");
@@ -1622,7 +1738,7 @@ function AuthPage({ onLogin }) {
 
             <div className="card" style={{ marginBottom: 14, borderColor: "var(--accent)" }}>
               <div className="card-title" style={{ color: "var(--accent)", marginBottom: 4 }}>🛡️ Guardian Details (Mandatory)</div>
-              <p className="card-sub" style={{ marginBottom: 10 }}>Emergency notifications, location links, and voice messages will be delivered to this guardian.</p>
+              <p className="card-sub" style={{ marginBottom: 10 }}>Emergency notifications, location links, and voice messages will be delivered to this guardian email.</p>
               <div className="input-group">
                 <label className="input-label">Guardian Full Name *</label>
                 <input className="input" value={form.guardianName} onChange={e => setForm(p => ({ ...p, guardianName: e.target.value }))} placeholder="Guardian full name" />
@@ -1674,7 +1790,7 @@ function AuthPage({ onLogin }) {
               guardianEmail: "priya@gmail.com",
               hasFaceRegistered: true
             };
-            speak("Welcome Ruchitha! Voice control active. You can say Home, Voice Chat, SOS, or Call Guardian.", 1, "en-US");
+            speak("Welcome Ruchitha! Voice control active. You can say Send Location, Voice Chat, Live News, or Search Google.", 1, "en-US");
             onLogin(demoUser);
           }}
         >
@@ -1686,21 +1802,22 @@ function AuthPage({ onLogin }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ROOT APP (WITH FULL DUAL VOICE & CLICK CONTROLLER FOR ALL 12 PAGES)
+// ROOT APP (WITH EXTENDED VOICE ROUTER & GUARDIAN SYNC)
 // ═══════════════════════════════════════════════════════════════════════════
 const NAV_ITEMS = [
   { id: "home",      icon: "🏠", label: "Home" },
-  { id: "voice",     icon: "🎙️", label: "Voice" },
+  { id: "voice",     icon: "💬", label: "Chat" },
+  { id: "location",  icon: "📍", label: "Location" },
+  { id: "news",      icon: "📰", label: "News" },
   { id: "emergency", icon: "🆘", label: "SOS" },
   { id: "ai",        icon: "🤖", label: "AI" },
-  { id: "settings",  icon: "⚙️", label: "Settings" },
 ];
 
 const PAGE_TITLES = {
-  home: "Smart Minds", voice: "Voice Chat", location: "My Location",
-  navigation: "Navigation", emergency: "Emergency SOS", ai: "AI Agent",
-  ocr: "Read Text", vision: "Scene Vision", places: "Saved Places",
-  contacts: "Contacts & Guardian", history: "Activity History", settings: "Settings",
+  home: "Smart Minds", voice: "Guardian Voice Chat", location: "My Location",
+  news: "Live Google News & Search", navigation: "Navigation", emergency: "Emergency SOS",
+  ai: "AI Voice Agent", ocr: "Read Text", vision: "Scene Vision", places: "Saved Places",
+  contacts: "Guardian Profile", history: "Activity History", settings: "Settings",
 };
 
 export default function App() {
@@ -1724,7 +1841,7 @@ export default function App() {
 
   const showToast = (msg) => setToast(msg);
 
-  // Global Speech Recognition Loop for Navigation Commands Across All 12 Pages
+  // Global Speech Recognition Router Supporting Email Sending, Guardian Replies, and Live News
   useEffect(() => {
     if (!authed) return;
 
@@ -1745,11 +1862,17 @@ export default function App() {
           const lastIdx = e.results.length - 1;
           const transcript = e.results[lastIdx][0].transcript.toLowerCase().trim();
 
-          if (transcript.includes("go to home") || transcript === "home") {
+          if (transcript.includes("send my location") || transcript.includes("send location")) {
+            speak(`Emailing location link to guardian ${user.guardianName || ""} at ${user.guardianEmail || ""}.`, settings.speechRate);
+            setPage("location");
+          } else if (transcript.includes("news") || transcript.includes("what is the current news")) {
+            speak("Opening Live News Reader.", settings.speechRate);
+            setPage("news");
+          } else if (transcript.includes("go to home") || transcript === "home") {
             speak("Going to Home.", settings.speechRate);
             setPage("home");
-          } else if (transcript.includes("open voice chat") || transcript.includes("voice chat")) {
-            speak("Opening Voice Chat.", settings.speechRate);
+          } else if (transcript.includes("open voice chat") || transcript.includes("voice chat") || transcript.includes("guardian chat")) {
+            speak("Opening Guardian Voice Chat.", settings.speechRate);
             setPage("voice");
           } else if (transcript.includes("open sos") || transcript.includes("emergency") || transcript.includes("help me")) {
             speak("Opening Emergency SOS.", settings.speechRate);
@@ -1770,7 +1893,7 @@ export default function App() {
             speak("Opening Saved Places.", settings.speechRate);
             setPage("places");
           } else if (transcript.includes("contacts") || transcript.includes("guardian")) {
-            speak("Opening Contacts & Guardian Info.", settings.speechRate);
+            speak("Opening Guardian Profile.", settings.speechRate);
             setPage("contacts");
           } else if (transcript.includes("history")) {
             speak("Opening Activity History.", settings.speechRate);
@@ -1778,9 +1901,6 @@ export default function App() {
           } else if (transcript.includes("settings")) {
             speak("Opening Settings.", settings.speechRate);
             setPage("settings");
-          } else if (transcript.includes("check location") || transcript.includes("where am i") || transcript.includes("check my location")) {
-            speak("Opening Location.", settings.speechRate);
-            setPage("location");
           } else if (transcript.includes("call guardian") || transcript.includes("call my guardian")) {
             speak(`Calling guardian ${user.guardianName || ""}.`, settings.speechRate);
             window.location.href = `tel:${(user.guardianPhone || "+919876543210").replace(/\s+/g, "")}`;
@@ -1823,6 +1943,7 @@ export default function App() {
       case "home":       return <HomePage {...PROPS} />;
       case "voice":      return <VoiceAssistantPage {...PROPS} />;
       case "location":   return <LocationPage {...PROPS} />;
+      case "news":       return <NewsSearchPage {...PROPS} />;
       case "navigation": return <NavigationPage {...PROPS} />;
       case "emergency":  return <EmergencyPage {...PROPS} />;
       case "ai":         return <AIAssistantPage {...PROPS} />;

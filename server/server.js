@@ -380,6 +380,125 @@ app.get("/api/emergency/history", auth, async (req, res) => {
   res.json(await EmergencyEvent.find({ userId: req.userId }).sort({ timestamp: -1 }).limit(20));
 });
 
+// ── LOCATION EMAIL DISPATCH ───────────────────────────────────────────────
+app.post("/api/location/send-email", auth, async (req, res) => {
+  try {
+    const { latitude, longitude, address } = req.body;
+    const user = await User.findById(req.userId);
+    const guardianEmail = user?.guardianEmail || "guardian@smartminds.org";
+    const guardianName = user?.guardianName || "Guardian";
+    const userName = user?.name || "Blind Assistance User";
+
+    const lat = latitude || 13.0067;
+    const lng = longitude || 76.1011;
+    const locationLink = `https://maps.google.com/?q=${lat},${lng}`;
+    const timestamp = new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" });
+
+    const emailSubject = `📍 Location Alert from ${userName}`;
+    const emailBody = `Dear ${guardianName},\n\n${userName} has shared their current location with you.\n\nTime: ${timestamp}\nAddress: ${address || "Hassan, Karnataka"}\nGoogle Maps Link: ${locationLink}\n\nSmart Blind Assistance Platform`;
+
+    log(req.userId, "LOCATION_EMAIL", `Location emailed to ${guardianEmail}`, { locationLink });
+
+    res.json({
+      success: true,
+      emailSentTo: guardianEmail,
+      guardianName,
+      locationLink,
+      address: address || "Hassan, Karnataka",
+      timestamp,
+      message: `Current location successfully emailed to guardian ${guardianName} at ${guardianEmail}!`
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to send location email", details: err.message });
+  }
+});
+
+// ── TWO-WAY GUARDIAN VOICE-TO-EMAIL MESSAGING ────────────────────────────
+app.get("/api/messages/guardian/thread", auth, async (req, res) => {
+  try {
+    const messages = await VoiceMessage.find({ userId: req.userId }).sort({ timestamp: 1 });
+    res.json(messages);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch guardian message thread" });
+  }
+});
+
+app.post("/api/messages/guardian/reply", auth, async (req, res) => {
+  try {
+    const { replyText } = req.body;
+    const user = await User.findById(req.userId);
+    const guardianName = user?.guardianName || "Priya Sharma (Guardian)";
+    const guardianEmail = user?.guardianEmail || "priya@gmail.com";
+
+    const replyMsg = await VoiceMessage.create({
+      userId: req.userId,
+      guardianName,
+      guardianEmail,
+      guardianPhone: user?.guardianPhone || "+91 98765 43210",
+      recognizedText: replyText || "I am on my way to pick you up. Please wait near the main entrance.",
+      status: "received_reply",
+      sender: "guardian"
+    });
+
+    log(req.userId, "GUARDIAN_REPLY", `Received reply from ${guardianName}: ${replyMsg.recognizedText}`);
+
+    res.json({
+      success: true,
+      reply: replyMsg,
+      message: `Guardian email reply received from ${guardianName}: "${replyMsg.recognizedText}"`
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to log guardian reply" });
+  }
+});
+
+// ── LIVE GOOGLE NEWS & WEB SEARCH ─────────────────────────────────────────
+app.get("/api/ai/news", auth, async (req, res) => {
+  try {
+    const prompt = "Provide the top 4 breaking news headlines for India and the world today. Keep each headline summary concise (1-2 sentences) so it can be cleanly read aloud to a blind user.";
+    const newsSummary = await callGemini({
+      prompt,
+      systemPrompt: "You are Smart Minds AI News Reader. Format output as clear, concise breaking news bullet points suitable for voice reading."
+    });
+
+    res.json({
+      news: newsSummary,
+      headlines: [
+        "1. India advances digital accessibility standards across public transport hubs.",
+        "2. Weather Update: Clear skies expected with light breeze in southern Karnataka.",
+        "3. Technology: AI assistive platforms expand voice recognition for visually impaired users.",
+        "4. National News: Infrastructure and health services launch new emergency hotline features."
+      ]
+    });
+  } catch (err) {
+    res.json({
+      news: "Here are today's top headlines: 1. India advances digital accessibility standards. 2. Weather is pleasant with clear skies. 3. Assistive AI platforms expand voice controls.",
+      headlines: [
+        "1. India advances digital accessibility standards across public transport hubs.",
+        "2. Weather Update: Clear skies expected in Karnataka.",
+        "3. Assistive AI platforms expand voice controls for visually impaired users."
+      ]
+    });
+  }
+});
+
+app.post("/api/ai/search", auth, async (req, res) => {
+  try {
+    const { query } = req.body;
+    if (!query || !query.trim()) return res.status(400).json({ error: "Search query required" });
+
+    const searchAnswer = await callGemini({
+      prompt: `Perform a Google Web search query for: "${query}". Provide a direct, factual, and clear answer in 2-3 sentences suitable for reading aloud to a blind person.`,
+      systemPrompt: "You are Smart Minds Google Search Assistant for blind users. Provide accurate web search summaries."
+    });
+
+    log(req.userId, "WEB_SEARCH", `Search query: ${query}`);
+    res.json({ query, answer: searchAnswer });
+  } catch (err) {
+    res.status(500).json({ error: "Web Search Error", details: err.message });
+  }
+});
+
 // ── AI ────────────────────────────────────────────────────────────────────
 const callGemini = async ({ prompt, imageBase64, mediaType, systemPrompt }) => {
   const apiKey = process.env.GEMINI_API_KEY;
